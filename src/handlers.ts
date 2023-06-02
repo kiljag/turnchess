@@ -1,7 +1,6 @@
 import { WebSocket } from "ws";
 import { Color } from "chess.js";
 import * as types from './types';
-import * as util from './util';
 import { GameRoom } from "./room";
 
 const roomIdToGameRoom: Record<string, GameRoom> = {}
@@ -9,20 +8,18 @@ const playerIdtoRoomId: Record<string, string> = {}
 
 export function handleCreateRoom(ws: WebSocket, payload: any) {
 
-    // assign random color if not selected by player
-    let c = payload || payload['color'] as string;
-    let color: Color = c === 'w' ? 'w' : c === 'b' ? 'b'
-        : (Math.random() < 0.5 ? "w" : "b");
-
     let room = new GameRoom();
-    let playerInfo = room.addPlayer(ws, color);
     roomIdToGameRoom[room.roomId] = room;
-    playerIdtoRoomId[playerInfo.playerId] = room.roomId;
-    room.notifyNewPlayer(ws, playerInfo);
-
+    room.sendNewRoom(ws);
 }
 
 export function handleJoinRoom(ws: WebSocket, payload: any) {
+
+    if (!payload) {
+        console.log('invalid payload for joinroom', payload);
+        ws.close();
+        return;
+    }
 
     let roomId = payload['roomId'] as string;
     let room = roomIdToGameRoom[roomId];
@@ -40,12 +37,22 @@ export function handleJoinRoom(ws: WebSocket, payload: any) {
         return;
     }
 
-    let playerInfo = room.addPlayer(ws, room.getAvailableColor());
-    roomIdToGameRoom[room.roomId] = room;
+    let color = payload['color'] as string;
+    let c: Color;
+    if (room.isEmpty() && (color === 'w' || color === 'b')) {
+        c = color;
+    } else {
+        c = room.getAvailableColor();
+    }
+
+    let playerInfo = room.addPlayer(ws, c);
     playerIdtoRoomId[playerInfo.playerId] = roomId;
-    room.notifyNewPlayer(ws, playerInfo);
-    console.log('starting game ', roomId);
-    room.startGame(); // start the game
+    room.sendNewPlayer(ws, playerInfo);
+
+    if (room.isFull()) { // start the game
+        console.log('starting game ', roomId);
+        room.sendStartGame();
+    }
 }
 
 export function handleViewRoom(ws: WebSocket, payload: any) {
@@ -58,8 +65,8 @@ export function handleViewRoom(ws: WebSocket, payload: any) {
         return;
     }
 
-    let playerInfo = room.addPlayer(ws, 'v');
-    room.notifyNewPlayer(ws, playerInfo);
+    let viewerInfo = room.addViewer(ws);
+    room.sendNewViewer(ws, viewerInfo);
 }
 
 export function handleLeaveRoom(ws: WebSocket, payload: any) {
@@ -86,8 +93,8 @@ export function handleMakeMove(ws: WebSocket, payload: any) {
             return;
         }
 
-        let valid = room.maveMove(playerId, move);
-        if (!valid) {
+        let chessMove = room.makeMove(playerId, move);
+        if (!chessMove) {
             console.error('invalid move:', move);
             ws.close();
             return;
@@ -97,12 +104,12 @@ export function handleMakeMove(ws: WebSocket, payload: any) {
         room.broadCastToAll({
             type: types.TYPE_CHESS_MOVE,
             payload: {
-                'move': move
+                'move': chessMove,
             }
         });
 
         if (room.chess.isGameOver()) {
-            room.endGame();
+            room.sendEndGame();
         }
 
     } catch (err) {

@@ -7,7 +7,9 @@ export const TYPE_LEAVE_ROOM = "leave_room";
 export const TYPE_MAKE_MOVE = "make_move";
 
 // to client
+export const TYPE_NEW_ROOM = "new_room";
 export const TYPE_NEW_PLAYER = "new_player";
+export const TYPE_NEW_VIEWER = "new_viewer";
 export const TYPE_START_GAME = "start_game";
 export const TYPE_END_GAME = "end_game";
 export const TYPE_CHESS_MOVE = "game_move";

@@ -5,7 +5,6 @@ import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
 import * as handlers from "./handlers";
 import * as types from "./types";
-import * as util from "./util";
 
 
 const PORT = 8080;
