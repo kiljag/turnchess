@@ -108,9 +108,7 @@ export function handleMakeMove(ws: WebSocket, payload: any) {
             }
         });
 
-        if (room.chess.isGameOver()) {
-            room.sendEndGame();
-        }
+        room.checkEndGame();
 
     } catch (err) {
         console.error('error in make move : ', err);

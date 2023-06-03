@@ -104,6 +104,18 @@ export class GameRoom {
         }
     }
 
+    checkEndGame() {
+        if (this.chess.isGameOver()) {
+            this.broadCastToAll({
+                type: types.TYPE_END_GAME,
+                payload: {
+                    "isgameover": true,
+                }
+            });
+            this.clear(); // clear game
+        }
+    }
+
     sendNewRoom(ws: WebSocket) {
         try {
             ws.send(JSON.stringify({
@@ -148,12 +160,6 @@ export class GameRoom {
     sendStartGame() {
         this.broadCastToAll({
             type: types.TYPE_START_GAME,
-        });
-    }
-
-    sendEndGame() {
-        this.broadCastToAll({
-            type: types.TYPE_END_GAME,
         });
     }
 
