@@ -58,6 +58,10 @@ wss.on('connection', (ws: any) => {
                     break;
                 }
 
+                case types.TYPE_RTC_MESSAGE: {
+                    handlers.handleRTCMessage(ws, payload);
+                }
+
                 default: {
                     console.log('invalid type : ', type);
                     break;

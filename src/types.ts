@@ -20,3 +20,5 @@ export const TYPE_VIEWER_INFO = "viewer_info";
 export const TYPE_ROOM_IS_FULL = "room_full";
 export const TYPE_INVALID_MOVE = "invalid_move";
 
+// rtc
+export const TYPE_RTC_MESSAGE = "rtc_message";
