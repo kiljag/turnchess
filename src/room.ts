@@ -5,6 +5,20 @@ import { v4 as uuidv4 } from 'uuid';
 
 type Color = 'w' | 'b';
 
+// one who creates the room
+interface HostInfo {
+    sessionId: string,
+    wsocket: WebSocket,
+    offer: any, // webrtc offer
+}
+
+// one who joins the room
+interface GuestInfo {
+    sessionId: string,
+    wsocket: WebSocket,
+    answer: any, // webrtc answer
+}
+
 interface PlayerInfo {
     playerId: string,
     color: Color,
@@ -19,7 +33,7 @@ interface ViewerInfo {
 function getRandomRoomId() {
     let chars = "0123456789"
     let id = "";
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 6; i++) {
         let ri = Math.floor(Math.random() * 10);
         id += chars[ri];
     }
@@ -30,22 +44,57 @@ export class GameRoom {
 
     roomId: string;
     chess: Chess;
+    hostInfo: HostInfo | null;
+    guestInfo: GuestInfo | null;
     whitePlayer: PlayerInfo | null;
     blackPlayer: PlayerInfo | null;
     viewers: ViewerInfo[];
+    isCreated: boolean;
 
     constructor() {
         this.roomId = getRandomRoomId();
         this.chess = new Chess();
+        this.hostInfo = null;
+        this.guestInfo = null;
         this.whitePlayer = null;
         this.blackPlayer = null;
         this.viewers = [];
+        this.isCreated = false;
     }
 
     clear(): void {
         this.chess = new Chess();
         this.whitePlayer = null;
         this.blackPlayer = null;
+    }
+
+    isFull() {
+        return (this.hostInfo && this.guestInfo);
+    }
+
+    isValidSessionId(sessionId: string): boolean {
+        return (this.hostInfo !== null && this.hostInfo.sessionId === sessionId) ||
+            (this.guestInfo !== null && this.guestInfo.sessionId === sessionId);
+    }
+
+    setHost(ws: WebSocket): HostInfo {
+        let hostInfo: HostInfo = {
+            sessionId: uuidv4(),
+            wsocket: ws,
+            offer: null,
+        }
+        this.hostInfo = hostInfo;
+        return hostInfo;
+    }
+
+    setGuest(ws: WebSocket): GuestInfo {
+        let guestInfo: GuestInfo = {
+            sessionId: uuidv4(),
+            wsocket: ws,
+            answer: null,
+        }
+        this.guestInfo = guestInfo;
+        return guestInfo;
     }
 
     addPlayer(ws: WebSocket, color: Color): PlayerInfo {
@@ -74,16 +123,17 @@ export class GameRoom {
     }
 
     getAvailableColor(): Color {
-        return this.whitePlayer !== null ? 'b'
-            : (Math.random() < 0.5 ? 'w' : 'b');
+        if (this.whitePlayer !== null) return 'b';
+        if (this.blackPlayer !== null) return 'w';
+        return (Math.random() < 0.5 ? 'w' : 'b');
     }
 
-    isEmpty(): boolean {
+    boardIsEmpty(): boolean {
         return this.whitePlayer === null &&
             this.blackPlayer === null;
     }
 
-    isFull(): boolean {
+    boardIsFull(): boolean {
         return this.whitePlayer !== null &&
             this.blackPlayer !== null;
     }
@@ -116,23 +166,27 @@ export class GameRoom {
         }
     }
 
-    sendNewRoom(ws: WebSocket) {
+    sendRoomCreated() {
         try {
-            ws.send(JSON.stringify({
-                type: types.TYPE_NEW_ROOM,
-                payload: {
-                    roomId: this.roomId,
-                }
-            }));
+            let message = {
+                type: types.TYPE_ROOM_CREATED,
+            }
+            if (this.hostInfo && this.hostInfo.wsocket.readyState !== WebSocket.CLOSED) {
+                this.hostInfo.wsocket.send(JSON.stringify(message));
+            }
+            if (this.guestInfo && this.guestInfo.wsocket.readyState !== WebSocket.CLOSED) {
+                this.guestInfo.wsocket.send(JSON.stringify(message));
+            }
+            this.isCreated = true;
         } catch (err) {
-            console.log('error sending new room : ', err);
+            console.error('error in sending room created :', err);
         }
     }
 
-    sendNewPlayer(ws: WebSocket, playerInfo: PlayerInfo) {
+    sendPlayerInfo(ws: WebSocket, playerInfo: PlayerInfo) {
         try {
             ws.send(JSON.stringify({
-                type: types.TYPE_NEW_PLAYER,
+                type: types.TYPE_PLAYER_INFO,
                 payload: {
                     playerId: playerInfo.playerId,
                     color: playerInfo.color,
@@ -144,10 +198,10 @@ export class GameRoom {
         }
     }
 
-    sendNewViewer(ws: WebSocket, viewerInfo: ViewerInfo) {
+    sendViewerInfo(ws: WebSocket, viewerInfo: ViewerInfo) {
         try {
             ws.send(JSON.stringify({
-                type: types.TYPE_NEW_VIEWER,
+                type: types.TYPE_VIEWER_INFO,
                 payload: {
                     fen: this.chess.fen(),
                 }
@@ -171,6 +225,8 @@ export class GameRoom {
             }
         });
     }
+
+
 
     broadCastToAll(message: any): void {
         try {

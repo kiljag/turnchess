@@ -33,22 +33,35 @@ wss.on('connection', (ws: any) => {
             const payload = message['payload'] || {};
 
             switch (type) {
-                case types.TYPE_CREATE_ROOM:
+                case types.TYPE_CREATE_ROOM: {
                     handlers.handleCreateRoom(ws, payload);
                     break;
+                }
 
-                case types.TYPE_JOIN_ROOM:
+                case types.TYPE_JOIN_ROOM: {
                     handlers.handleJoinRoom(ws, payload);
                     break;
+                }
 
-                case types.TYPE_VIEW_ROOM:
-                    handlers.handleViewRoom(ws, payload);
+                case types.TYPE_ADD_TO_ROOM: {
+                    handlers.handleAddToRoom(ws, payload);
+                    break;
+                }
 
-                case types.TYPE_LEAVE_ROOM:
-                    handlers.handleLeaveRoom(ws, payload);
-
-                case types.TYPE_MAKE_MOVE:
+                case types.TYPE_MAKE_MOVE: {
                     handlers.handleMakeMove(ws, payload);
+                    break;
+                }
+
+                case types.TYPE_LEAVE_ROOM: {
+                    handlers.handleLeaveRoom(ws, payload);
+                    break;
+                }
+
+                default: {
+                    console.log('invalid type : ', type);
+                    break;
+                }
             }
         } catch (err) {
             console.error(err, data.toString());

@@ -2,20 +2,35 @@ import { WebSocket } from "ws";
 import { Color } from "chess.js";
 import * as types from './types';
 import { GameRoom } from "./room";
+import { v4 as uuidv4 } from 'uuid';
 
 const roomIdToGameRoom: Record<string, GameRoom> = {}
-const playerIdtoRoomId: Record<string, string> = {}
 
-export function handleCreateRoom(ws: WebSocket, payload: any) {
-
+export function handleCreateRoom(ws: any, payload: any) {
     let room = new GameRoom();
     roomIdToGameRoom[room.roomId] = room;
-    room.sendNewRoom(ws);
+
+    // send roominfo to host
+    try {
+        let hostInfo = room.setHost(ws);
+        ws.sessionId = hostInfo.sessionId;
+        ws.send(JSON.stringify({
+            type: types.TYPE_ROOM_INFO,
+            payload: {
+                sessionId: hostInfo.sessionId,
+                roomId: room.roomId,
+            }
+        }));
+
+    } catch (err) {
+        delete roomIdToGameRoom[room.roomId];
+        console.error('error sending roominfo to host, ', err);
+    }
 }
 
-export function handleJoinRoom(ws: WebSocket, payload: any) {
+export function handleJoinRoom(ws: any, payload: any) {
 
-    if (!payload) {
+    if (!payload || !payload['roomId']) {
         console.log('invalid payload for joinroom', payload);
         ws.close();
         return;
@@ -23,8 +38,8 @@ export function handleJoinRoom(ws: WebSocket, payload: any) {
 
     let roomId = payload['roomId'] as string;
     let room = roomIdToGameRoom[roomId];
-    if (room === undefined) {
-        console.log('invalid roomId : ', roomId);
+    if (!room) {
+        console.log('no room found for ', roomId);
         ws.close();
         return;
     }
@@ -32,70 +47,106 @@ export function handleJoinRoom(ws: WebSocket, payload: any) {
     if (room.isFull()) {
         console.log('room is full ', roomId);
         ws.send(JSON.stringify({
-            type: types.TYPE_ROOM_FULL,
+            type: types.TYPE_ROOM_IS_FULL,
         }));
         return;
     }
 
+    // send roominfo to guest
+    try {
+        let guestInfo = room.setGuest(ws);
+        ws.sessionId = guestInfo.sessionId;
+        ws.send(JSON.stringify({
+            type: types.TYPE_ROOM_INFO,
+            payload: {
+                sessionId: guestInfo.sessionId,
+                roomId: room.roomId,
+            },
+        }));
+
+        room.sendRoomCreated();
+    } catch (err) {
+        console.error('error sending roominfo to guest, ', err);
+    }
+}
+
+export function handleAddToRoom(ws: WebSocket, payload: any) {
+
+    // sanity check
+    if ((payload === undefined) || (payload['sessionId'] === undefined) ||
+        (payload['roomId'] === undefined)) {
+        console.error('invalid add_to_room payload : ', payload);
+        ws.close();
+        return;
+    }
+
+    let sessionId = payload['sessionId'] as string;
+    let roomId = payload['roomId'] as string;
     let color = payload['color'] as string;
+    let room = roomIdToGameRoom[roomId];
+
+    // player should be either host or guest
+    if (room === undefined || !room.isCreated ||
+        !room.isValidSessionId(sessionId)) {
+        console.error('invalid roomId/sessionId : ', payload);
+        ws.close();
+        return;
+    }
+
+    // if board is already full
+    if (room.boardIsFull()) {
+        console.log('board is full, can not add player');
+        ws.close();
+        return;
+    }
+
+    // choose a color
     let c: Color;
-    if (room.isEmpty() && (color === 'w' || color === 'b')) {
+    if (room.boardIsEmpty() && (color === 'w' || color === 'b')) {
         c = color;
     } else {
         c = room.getAvailableColor();
     }
 
+    // create and send playerInfo
     let playerInfo = room.addPlayer(ws, c);
-    playerIdtoRoomId[playerInfo.playerId] = roomId;
-    room.sendNewPlayer(ws, playerInfo);
+    room.sendPlayerInfo(ws, playerInfo);
 
-    if (room.isFull()) { // start the game
+    if (room.boardIsFull()) { // start the game
         console.log('starting game ', roomId);
         room.sendStartGame();
     }
 }
 
-export function handleViewRoom(ws: WebSocket, payload: any) {
-
-    let roomId = payload['roomId'] as string;
-    let room = roomIdToGameRoom[roomId];
-    if (room === undefined) {
-        console.log('invalid roomId : ', roomId);
-        ws.close();
-        return;
-    }
-
-    let viewerInfo = room.addViewer(ws);
-    room.sendNewViewer(ws, viewerInfo);
-}
-
-export function handleLeaveRoom(ws: WebSocket, payload: any) {
-
-
-}
-
 export function handleMakeMove(ws: WebSocket, payload: any) {
 
     try {
-        if (!payload || !payload['playerId'] || !payload['move']) {
-            console.log('invalid payload', payload);
+        // sanity check
+        if ((payload === undefined) || (payload['sessionId'] === undefined) ||
+            (payload['roomId'] === undefined) || (payload['playerId'] === undefined) ||
+            (payload['move'] === undefined)) {
+            console.error('invalid make_move payload : ', payload);
             ws.close();
             return;
         }
 
-        let playerId = payload['playerId'];
-        let move = payload['move'];
-        let roomId = playerIdtoRoomId[playerId];
+        let sessionId = payload['sessionId'] as string;
+        let roomId = payload['roomId'] as string;
+        let playerId = payload['playerId'] as string;
+        let move = payload['move'] as string;
         let room = roomIdToGameRoom[roomId];
-        if (!room) {
-            console.error('no room found');
+
+        // player should be either host or guest
+        if (room === undefined || !room.isCreated ||
+            !room.isValidSessionId(sessionId)) {
+            console.error('invalid roomId/sessionId : ', payload);
             ws.close();
             return;
         }
 
         let chessMove = room.makeMove(playerId, move);
         if (!chessMove) {
-            console.error('invalid move:', move);
+            console.error('invalid turn/move:', move);
             ws.close();
             return;
         }
@@ -113,5 +164,25 @@ export function handleMakeMove(ws: WebSocket, payload: any) {
     } catch (err) {
         console.error('error in make move : ', err);
     }
+}
+
+export function handleLeaveRoom(ws: WebSocket, payload: any) {
+
+
+}
+
+
+export function handleViewRoom(ws: WebSocket, payload: any) {
+
+    let roomId = payload['roomId'] as string;
+    let room = roomIdToGameRoom[roomId];
+    if (room === undefined) {
+        console.log('invalid roomId : ', roomId);
+        ws.close();
+        return;
+    }
+
+    let viewerInfo = room.addViewer(ws);
+    // room.sendNewViewer(ws, viewerInfo);
 }
 
