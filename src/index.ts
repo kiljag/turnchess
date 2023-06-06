@@ -60,6 +60,12 @@ wss.on('connection', (ws: any) => {
 
                 case types.TYPE_RTC_MESSAGE: {
                     handlers.handleRTCMessage(ws, payload);
+                    break;
+                }
+
+                case types.TYPE_CHAT_MESSAGE: {
+                    handlers.handleChatMessage(ws, payload);
+                    break;
                 }
 
                 default: {

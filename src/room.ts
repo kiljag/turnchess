@@ -147,7 +147,7 @@ export class GameRoom {
 
         try {
             let chessMove = this.chess.move(move);
-            return chessMove.lan;
+            return chessMove.san;
         } catch (err) {
             console.log(`error in move : `, err);
             return null;
@@ -226,7 +226,22 @@ export class GameRoom {
         });
     }
 
+    broadCastToPlayers(message: any): void {
+        try {
+            if (this.hostInfo &&
+                this.hostInfo.wsocket.readyState !== WebSocket.CLOSED) {
+                this.hostInfo.wsocket.send(JSON.stringify(message));
+            }
 
+            if (this.guestInfo &&
+                this.guestInfo.wsocket.readyState !== WebSocket.CLOSED) {
+                this.guestInfo.wsocket.send(JSON.stringify(message));
+            }
+
+        } catch (err) {
+            console.error(`error in broadcasting to players : ${message}`, err)
+        }
+    }
 
     broadCastToAll(message: any): void {
         try {

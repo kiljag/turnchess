@@ -22,3 +22,6 @@ export const TYPE_INVALID_MOVE = "invalid_move";
 
 // rtc
 export const TYPE_RTC_MESSAGE = "rtc_message";
+
+// chat
+export const TYPE_CHAT_MESSAGE = "chat_message";

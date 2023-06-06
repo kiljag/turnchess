@@ -190,7 +190,8 @@ export function handleViewRoom(ws: WebSocket, payload: any) {
 export function handleRTCMessage(ws: WebSocket, payload: any) {
 
     // sanity check
-    if ((payload === undefined) || (payload['sessionId'] === undefined)) {
+    if ((payload === undefined) || (payload['sessionId'] === undefined) ||
+        (payload['roomId'] === undefined)) {
         console.error('invalid rtc_message payload : ', payload);
         ws.close();
         return;
@@ -248,6 +249,35 @@ export function handleRTCMessage(ws: WebSocket, payload: any) {
     } catch (err) {
         console.error('error in parsing rtc message : ', err);
     }
+}
 
+export function handleChatMessage(ws: WebSocket, payload: any) {
+    // sanity check
+    if ((payload === undefined) || (payload['sessionId'] === undefined) ||
+        (payload['roomId'] === undefined) || (payload['message'] === undefined)) {
+        console.error('invalid chat_message payload : ', payload);
+        ws.close();
+        return;
+    }
 
+    let sessionId = payload['sessionId'] as string;
+    let roomId = payload['roomId'] as string;
+    let message = payload['message'] as string;
+
+    let room = roomIdToGameRoom[roomId];
+    // player should be either host or guest
+    if (room === undefined || !room.isCreated ||
+        !room.isValidSessionId(sessionId)) {
+        console.error('invalid roomId/sessionId in chat message payload: ', payload);
+        ws.close();
+        return;
+    }
+
+    room.broadCastToPlayers({
+        type: types.TYPE_CHAT_MESSAGE,
+        payload: {
+            chatId: Math.floor(100000 * Math.random()),
+            message: message,
+        }
+    });
 }
