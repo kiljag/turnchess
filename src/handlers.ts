@@ -4,7 +4,33 @@ import * as types from './types';
 import { GameRoom } from "./room";
 import { v4 as uuidv4 } from 'uuid';
 
+const sessionIdToRoomId: Record<string, string> = {}
 const roomIdToGameRoom: Record<string, GameRoom> = {}
+
+export function handleOnDisconnect(ws: any) {
+    let sessionId = ws.sessionId;
+    let roomId = sessionIdToRoomId[sessionId];
+    let room = roomIdToGameRoom[roomId];
+
+    if (roomId === undefined || room === undefined) {
+        return;
+    }
+
+    try {
+        if (room.hostInfo?.sessionId === sessionId) {
+            room.guestInfo?.wsocket.send(JSON.stringify({
+                type: types.TYPE_OPPONENT_LEFT,
+            }))
+        } else if (room.guestInfo?.sessionId === sessionId) {
+            room.hostInfo?.wsocket.send(JSON.stringify({
+                type: types.TYPE_OPPONENT_LEFT,
+            }))
+        }
+
+    } catch (err) {
+        console.error('error in disconnect : ', err);
+    }
+}
 
 export function handleCreateRoom(ws: any, payload: any) {
     let room = new GameRoom();
@@ -22,6 +48,7 @@ export function handleCreateRoom(ws: any, payload: any) {
                 isHost: true,
             }
         }));
+        sessionIdToRoomId[ws.sessionId] = room.roomId;
 
     } catch (err) {
         delete roomIdToGameRoom[room.roomId];
@@ -64,8 +91,9 @@ export function handleJoinRoom(ws: any, payload: any) {
                 roomId: room.roomId,
             },
         }));
-
+        sessionIdToRoomId[ws.sessionId] = room.roomId;
         room.sendRoomCreated();
+
     } catch (err) {
         console.error('error sending roominfo to guest, ', err);
     }
@@ -168,10 +196,8 @@ export function handleMakeMove(ws: WebSocket, payload: any) {
 }
 
 export function handleLeaveRoom(ws: WebSocket, payload: any) {
-
-
+    console.error('method not implemented');
 }
-
 
 export function handleViewRoom(ws: WebSocket, payload: any) {
 
@@ -263,6 +289,7 @@ export function handleChatMessage(ws: WebSocket, payload: any) {
     let sessionId = payload['sessionId'] as string;
     let roomId = payload['roomId'] as string;
     let message = payload['message'] as string;
+    let userId = payload['userId'] as string;
 
     let room = roomIdToGameRoom[roomId];
     // player should be either host or guest
@@ -277,6 +304,7 @@ export function handleChatMessage(ws: WebSocket, payload: any) {
         type: types.TYPE_CHAT_MESSAGE,
         payload: {
             chatId: Math.floor(100000 * Math.random()),
+            userId: userId,
             message: message,
         }
     });

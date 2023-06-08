@@ -19,9 +19,8 @@ export const TYPE_VIEWER_INFO = "viewer_info";
 // to client error messages
 export const TYPE_ROOM_IS_FULL = "room_full";
 export const TYPE_INVALID_MOVE = "invalid_move";
+export const TYPE_OPPONENT_LEFT = "opponent_left";
 
-// rtc
+// rtc and chat
 export const TYPE_RTC_MESSAGE = "rtc_message";
-
-// chat
 export const TYPE_CHAT_MESSAGE = "chat_message";

@@ -23,12 +23,13 @@ wss.on('connection', (ws: any) => {
 
     ws.on('close', () => {
         console.log('connection closed : ', ws.connectionId);
+        handlers.handleOnDisconnect(ws);
     });
 
     ws.on('message', (data: any) => {
         try {
             const message = JSON.parse(data.toString());
-            console.log('received : ', message);
+            // console.log('received : ', message);
             const type = message['type'];
             const payload = message['payload'] || {};
 
