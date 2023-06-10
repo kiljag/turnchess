@@ -88,7 +88,7 @@ export function handleMakeMove(ws: any, payload: any) {
             // send start game again
             if (room.matchesPlayed < room.numMatches) {
                 let startMatch = function (room: ChessRoom) {
-                    room.broadCastToPlayers({
+                    room.broadCastToAll({
                         type: types.TYPE_START_GAME,
                         payload: {
                             matchId: room.matchesPlayed + 1,

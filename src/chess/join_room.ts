@@ -150,6 +150,10 @@ export function handleJoinRoom(ws: any, payload: any) {
                 }
             }));
 
+            ws.send(JSON.stringify({
+                type: types.TYPE_ROOM_READY,
+            }));
+
             room.addPlayer(viewerInfo);
             chessStore.setChessRoom(sessionId, room);
         }

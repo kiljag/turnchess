@@ -1,7 +1,6 @@
 import { Chess } from 'chess.js';
 import { WebSocket } from 'ws';
 import * as types from './types';
-import { v4 as uuidv4 } from 'uuid';
 
 export type Color = 'w' | 'b' | 'v';
 export type RoomState = "empty" | "vacant" | "ready";
