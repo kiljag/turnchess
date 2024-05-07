@@ -50,6 +50,7 @@ export function handleCreateRoom(ws: any, payload: any) {
                 userId: hostInfo.userId,
                 roomId: room.roomId,
                 isPlayer: true,
+                isHost: true,
             }
         }));
 
